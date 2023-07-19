@@ -8,7 +8,11 @@ bibs = entities["bibs"]
 borrowing_history = entities["borrowingHistory"]
 checked_outs = {}
 for b in borrowing_history.values():
-    checked_outs[b["metadataId"]] = b["checkedoutDate"]
+    checked_outs[b["metadataId"]] = {
+        "checkedoutDate": b["checkedoutDate"],
+        "metadataId": b["metadataId"],
+        "id": b["id"],
+    }
 pagination = data["borrowing"]["borrowingHistory"]["pagination"]
 
 for k, bib in bibs.items():
@@ -17,7 +21,9 @@ for k, bib in bibs.items():
             "title": bib["briefInfo"]["title"],
             "authors": "; ".join(bib["briefInfo"]["authors"]),
             "format": bib["briefInfo"]["format"],
-            "checkedOut": checked_outs[k],
+            "checkedoutDate": checked_outs[k]["checkedoutDate"],
+            "metadataId": checked_outs[k]["metadataId"],
+            "id": checked_outs[k]["id"],
         }
     )
 

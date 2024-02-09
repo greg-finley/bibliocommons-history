@@ -1,11 +1,8 @@
-from dotenv import load_dotenv
 import json
 import os
 import requests
-import csv
+from flask import Response
 from typing import NamedTuple, TypedDict
-
-load_dotenv()
 
 
 class Login(NamedTuple):
@@ -20,13 +17,13 @@ class User(TypedDict):
     account_id: str
 
 
-def main():
-    credentials: list[User] = json.loads(os.environ["CREDENTIALS"])
+def main(request):
+    credentials: list[User] = json.loads(os.environ["LIBRARY_CREDENTIALS"])
     processed_data = []
     for user in credentials:
         processed_data.extend(process_user(user))
 
-    write_to_csv(processed_data)
+    return Response(json.dumps(processed_data), mimetype="application/json")
 
 
 def process_user(user: User):
@@ -76,24 +73,6 @@ def handle_response(data, user: User):
     return processed_data, pagination
 
 
-def write_to_csv(processed_data):
-    with open("data.csv", "w") as csvfile:
-        fieldnames = [
-            "title",
-            "authors",
-            "format",
-            "checkedoutDate",
-            "metadataId",
-            "id",
-            "person",
-        ]
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-        writer.writeheader()
-        for row in processed_data:
-            writer.writerow(row)
-
-
 def get_data(page: int, login: Login, user: User) -> dict:
     headers = {
         "X-Access-Token": login.access_token,
@@ -136,7 +115,3 @@ def login(user: User) -> Login:
         )
     else:
         raise Exception("Login failed")
-
-
-if __name__ == "__main__":
-    main()

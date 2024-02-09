@@ -1,0 +1,33 @@
+name: deploy
+on:
+  push:
+    branches:
+      - main
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: "read"
+      id-token: "write"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: "auth"
+        uses: "google-github-actions/auth@v1"
+        with:
+          credentials_json: "${{ secrets.gcp_credentials }}"
+
+      - id: "deploy"
+        uses: "google-github-actions/deploy-cloud-functions@v1"
+        with:
+          name: "projects/greg-finley/locations/us-central1/functions/library-history"
+          runtime: "python312"
+          entry_point: "main"
+          secret_environment_variables: "LIBRARY_CREDENTIALS=projects/greg-finley/secrets/LIBRARY_CREDENTIALS/versions/latest"
+          memory_mb: 128
+          timeout: 300
+          min_instances: 0
+          max_instances: 10

@@ -82,8 +82,8 @@ def process_libby_user(user: LibbyUser) -> list[Bib]:
             checkedout_date=datetime.datetime.fromtimestamp(
                 i["timestamp"] / 1000
             ).isoformat(),
-            metadata_id=i["isbn"],
-            id=i["isbn"] + str(i["timestamp"]),
+            metadata_id=i["title"]["titleId"],
+            id=i["title"]["titleId"] + "_" + str(i["timestamp"]),
             person=user["user_id"],
         )
         for i in response.json()["timeline"]

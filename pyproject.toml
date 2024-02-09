@@ -9,6 +9,8 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.9"
 requests = "^2.31.0"
+selenium = "^4.17.2"
+webdriver-manager = "^4.0.1"
 
 [tool.poetry.group.dev.dependencies]
 types-requests = "^2.31.0.20240125"

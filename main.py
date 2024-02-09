@@ -3,7 +3,7 @@ import os
 import requests
 import datetime
 from flask import Response  # type: ignore
-from typing import NamedTuple, TypedDict
+from typing import Literal, NamedTuple, TypedDict
 
 
 class Login(NamedTuple):
@@ -11,11 +11,20 @@ class Login(NamedTuple):
     session_id: str
 
 
-class User(TypedDict):
+class LibbyUser(TypedDict):
+    user_id: str
+    type: Literal["Libby"]
+
+
+class BiblioCommonsUser(TypedDict):
     name: str
     user_id: str
     user_pin: str
     account_id: str
+    type: Literal["BiblioCommons"]
+
+
+User = LibbyUser | BiblioCommonsUser
 
 
 class Bib(TypedDict):
@@ -32,14 +41,17 @@ def main(request) -> Response:
     credentials: list[User] = json.loads(os.environ["LIBRARY_CREDENTIALS"])
     processed_data: list[Bib] = []
     for user in credentials:
-        processed_data.extend(process_user(user))
+        if user["type"] == "Libby":
+            processed_data.extend(process_libby_user(user))
+        elif user["type"] == "BiblioCommons":
+            processed_data.extend(process_bibliocommons_user(user))
 
     fivetran_response = to_fivetran_response(processed_data)
 
     return Response(json.dumps(fivetran_response), mimetype="application/json")
 
 
-def process_user(user: User) -> list[Bib]:
+def process_bibliocommons_user(user: BiblioCommonsUser) -> list[Bib]:
     login_details = login(user)
     i = 1
     all_processed_data: list[Bib] = []
@@ -55,7 +67,30 @@ def process_user(user: User) -> list[Bib]:
     return all_processed_data
 
 
-def handle_response(data, user: User) -> tuple[list[Bib], dict]:
+def process_libby_user(user: LibbyUser) -> list[Bib]:
+    response = requests.get(
+        f"https://share.libbyapp.com/data/{user['user_id']}/libbytimeline-all-loans.json"
+    )
+    if not response.ok:
+        raise Exception("Libby API request failed")
+    return [
+        Bib(
+            title=i["title"]["text"],
+            authors=i["author"],
+            format=i["cover"]["format"],
+            # like 1707508484000 but needs to be like "2024-02-04"
+            checkedout_date=datetime.datetime.fromtimestamp(
+                i["timestamp"] / 1000
+            ).isoformat(),
+            metadata_id=i["isbn"],
+            id=i["isbn"] + str(i["timestamp"]),
+            person=user["user_id"],
+        )
+        for i in response.json()["timeline"]
+    ]
+
+
+def handle_response(data, user: BiblioCommonsUser) -> tuple[list[Bib], dict]:
     entities = data["entities"]
     bibs = entities["bibs"]
     borrowing_history = entities["borrowingHistory"]
@@ -86,7 +121,7 @@ def handle_response(data, user: User) -> tuple[list[Bib], dict]:
     return processed_data, pagination
 
 
-def get_data(page: int, login: Login, user: User) -> dict:
+def get_data(page: int, login: Login, user: BiblioCommonsUser) -> dict:
     headers = {
         "X-Access-Token": login.access_token,
         "X-Session-Id": login.session_id,
@@ -103,10 +138,12 @@ def get_data(page: int, login: Login, user: User) -> dict:
         params=params,
         headers=headers,
     )
+    if not response.ok:
+        raise Exception("BiblioCommons API request failed")
     return response.json()
 
 
-def login(user: User) -> Login:
+def login(user: BiblioCommonsUser) -> Login:
     s = requests.Session()
     login_url = "https://ssfpl.bibliocommons.com/user/login"
     payload = {
@@ -127,7 +164,7 @@ def login(user: User) -> Login:
             session_id=s.cookies.get("session_id"),
         )
     else:
-        raise Exception("Login failed")
+        raise Exception("Bibliocommons login failed")
 
 
 def to_fivetran_response(bibs: list[Bib]) -> dict:

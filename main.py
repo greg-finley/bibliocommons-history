@@ -1,6 +1,7 @@
 import json
 import os
 import requests
+import datetime
 from flask import Response  # type: ignore
 from typing import NamedTuple, TypedDict
 
@@ -17,19 +18,31 @@ class User(TypedDict):
     account_id: str
 
 
+class Bib(TypedDict):
+    title: str
+    authors: str
+    format: str
+    checkedoutDate: str
+    metadataId: str
+    id: str
+    person: str
+
+
 def main(request) -> Response:
     credentials: list[User] = json.loads(os.environ["LIBRARY_CREDENTIALS"])
-    processed_data = []
+    processed_data: list[Bib] = []
     for user in credentials:
         processed_data.extend(process_user(user))
 
-    return Response(json.dumps(processed_data), mimetype="application/json")
+    fivetran_response = to_fivetran_response(processed_data)
+
+    return Response(json.dumps(fivetran_response), mimetype="application/json")
 
 
-def process_user(user: User):
+def process_user(user: User) -> list[Bib]:
     login_details = login(user)
     i = 1
-    all_processed_data = []
+    all_processed_data: list[Bib] = []
     while True:
         data = get_data(i, login_details, user)
         processed_data, pagination = handle_response(data, user)
@@ -42,7 +55,7 @@ def process_user(user: User):
     return all_processed_data
 
 
-def handle_response(data, user: User):
+def handle_response(data, user: User) -> tuple[list[Bib], dict]:
     entities = data["entities"]
     bibs = entities["bibs"]
     borrowing_history = entities["borrowingHistory"]
@@ -55,7 +68,7 @@ def handle_response(data, user: User):
         }
     pagination = data["borrowing"]["borrowingHistory"]["pagination"]
 
-    processed_data = []
+    processed_data: list[Bib] = []
 
     for k, bib in bibs.items():
         processed_data.append(
@@ -115,3 +128,17 @@ def login(user: User) -> Login:
         )
     else:
         raise Exception("Login failed")
+
+
+def to_fivetran_response(bibs: list[Bib]) -> dict:
+    # https://fivetran.com/docs/functions/google-cloud-functions#responseformat
+    return {
+        "state": {
+            "borrowing": datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        },
+        "insert": {
+            "borrowing": bibs,
+        },
+        "hasMore": False,
+        "schema": {"borrowing": {"primary_key": ["id"]}},
+    }

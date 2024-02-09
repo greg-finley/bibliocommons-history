@@ -1,8 +1,9 @@
 from dotenv import load_dotenv
+import json
 import os
 import requests
 import csv
-from typing import NamedTuple
+from typing import NamedTuple, TypedDict
 
 load_dotenv()
 
@@ -12,23 +13,39 @@ class Login(NamedTuple):
     session_id: str
 
 
+class User(TypedDict):
+    name: str
+    user_id: str
+    user_pin: str
+    account_id: str
+
+
 def main():
-    login_details = login()
+    credentials: list[User] = json.loads(os.environ["CREDENTIALS"])
+    processed_data = []
+    for user in credentials:
+        processed_data.extend(process_user(user))
+
+    write_to_csv(processed_data)
+
+
+def process_user(user: User):
+    login_details = login(user)
     i = 1
     all_processed_data = []
     while True:
-        data = get_data(i, login_details)
-        processed_data, pagination = handle_response(data)
+        data = get_data(i, login_details, user)
+        processed_data, pagination = handle_response(data, user)
         all_processed_data.extend(processed_data)
         print(pagination)
         if pagination["page"] == pagination["pages"]:
             break
         i += 1
 
-    write_to_csv(all_processed_data)
+    return all_processed_data
 
 
-def handle_response(data):
+def handle_response(data, user: User):
     entities = data["entities"]
     bibs = entities["bibs"]
     borrowing_history = entities["borrowingHistory"]
@@ -52,7 +69,7 @@ def handle_response(data):
                 "checkedoutDate": checked_outs[k]["checkedoutDate"],
                 "metadataId": checked_outs[k]["metadataId"],
                 "id": checked_outs[k]["id"],
-                "person": os.environ["PERSON"],
+                "person": user["name"],
             }
         )
 
@@ -77,14 +94,14 @@ def write_to_csv(processed_data):
             writer.writerow(row)
 
 
-def get_data(page: int, login: Login) -> dict:
+def get_data(page: int, login: Login, user: User) -> dict:
     headers = {
         "X-Access-Token": login.access_token,
         "X-Session-Id": login.session_id,
     }
 
     params = {
-        "accountId": os.environ["ACCOUNT_ID"],
+        "accountId": user["account_id"],
         "page": str(page),
         "locale": "en-US",
     }
@@ -97,13 +114,13 @@ def get_data(page: int, login: Login) -> dict:
     return response.json()
 
 
-def login() -> Login:
+def login(user: User) -> Login:
     s = requests.Session()
     login_url = "https://ssfpl.bibliocommons.com/user/login"
     payload = {
         "utf8": "✓",
-        "name": os.environ["USER_ID"],
-        "user_pin": os.environ["USER_PIN"],
+        "name": user["user_id"],
+        "user_pin": user["user_pin"],
     }
 
     headers = {

@@ -1,6 +1,7 @@
 import json
 import os
-import requests
+import aiohttp
+import asyncio
 from flask import Response  # type: ignore
 from typing import NamedTuple, TypedDict
 
@@ -18,27 +19,30 @@ class User(TypedDict):
 
 
 def main(request) -> Response:
+    return asyncio.run(async_main(request))
+
+
+async def async_main(request) -> Response:
     credentials: list[User] = json.loads(os.environ["LIBRARY_CREDENTIALS"])
-    processed_data = []
-    for user in credentials:
-        processed_data.extend(process_user(user))
+    tasks = [process_user(user) for user in credentials]
+    processed_data = await asyncio.gather(*tasks)
 
     return Response(json.dumps(processed_data), mimetype="application/json")
 
 
-def process_user(user: User):
-    login_details = login(user)
+async def process_user(user: User):
+    login_details = await login(user)
     i = 1
     all_processed_data = []
     while True:
-        data = get_data(i, login_details, user)
-        processed_data, pagination = handle_response(data, user)
+        data = await get_data(i, login_details, user)
+        processed_data, pagination = handle_response(
+            data, user
+        )  # Assume handle_response is now async or its logic is adapted
         all_processed_data.extend(processed_data)
-        print(pagination)
         if pagination["page"] == pagination["pages"]:
             break
         i += 1
-
     return all_processed_data
 
 
@@ -73,45 +77,42 @@ def handle_response(data, user: User):
     return processed_data, pagination
 
 
-def get_data(page: int, login: Login, user: User) -> dict:
+async def get_data(page: int, login: Login, user: User) -> dict:
     headers = {
         "X-Access-Token": login.access_token,
         "X-Session-Id": login.session_id,
     }
-
     params = {
         "accountId": user["account_id"],
         "page": str(page),
         "locale": "en-US",
     }
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            "https://gateway.bibliocommons.com/v2/libraries/ssfpl/borrowinghistory",
+            params=params,
+            headers=headers,
+        ) as response:
+            return await response.json()
 
-    response = requests.get(
-        "https://gateway.bibliocommons.com/v2/libraries/ssfpl/borrowinghistory",  # noqa E501
-        params=params,
-        headers=headers,
-    )
-    return response.json()
 
-
-def login(user: User) -> Login:
-    s = requests.Session()
-    login_url = "https://ssfpl.bibliocommons.com/user/login"
-    payload = {
-        "utf8": "✓",
-        "name": user["user_id"],
-        "user_pin": user["user_pin"],
-    }
-
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded",
-    }
-
-    response = s.post(login_url, data=payload, headers=headers)
-
-    if response.ok:
-        return Login(
-            access_token=s.cookies.get("bc_access_token"),
-            session_id=s.cookies.get("session_id"),
-        )
-    else:
-        raise Exception("Login failed")
+async def login(user: User) -> Login:
+    async with aiohttp.ClientSession() as session:
+        login_url = "https://ssfpl.bibliocommons.com/user/login"
+        payload = {
+            "utf8": "✓",
+            "name": user["user_id"],
+            "user_pin": user["user_pin"],
+        }
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+        async with session.post(login_url, data=payload, headers=headers) as response:
+            if response.status == 200:
+                cookies = response.cookies
+                return Login(
+                    access_token=cookies["bc_access_token"].value,
+                    session_id=cookies["session_id"].value,
+                )
+            else:
+                raise Exception("Login failed")

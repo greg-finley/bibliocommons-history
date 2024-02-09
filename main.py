@@ -12,6 +12,7 @@ class Login(NamedTuple):
 
 
 class LibbyUser(TypedDict):
+    name: str
     user_id: str
     type: Literal["Libby"]
 
@@ -79,12 +80,12 @@ def process_libby_user(user: LibbyUser) -> list[Bib]:
             authors=i["author"],
             format=i["cover"]["format"],
             # like 1707508484000 but needs to be like "2024-02-04"
-            checkedout_date=datetime.datetime.fromtimestamp(
-                i["timestamp"] / 1000
-            ).isoformat(),
+            checkedout_date=datetime.datetime.fromtimestamp(i["timestamp"] / 1000)
+            .date()
+            .isoformat(),
             metadata_id=i["title"]["titleId"],
             id=i["title"]["titleId"] + "_" + str(i["timestamp"]),
-            person=user["user_id"],
+            person=user["name"],
         )
         for i in response.json()["timeline"]
     ]

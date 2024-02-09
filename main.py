@@ -22,8 +22,8 @@ class Bib(TypedDict):
     title: str
     authors: str
     format: str
-    checkedoutDate: str
-    metadataId: str
+    checkedout_date: str
+    metadata_id: str
     id: str
     person: str
 
@@ -76,8 +76,8 @@ def handle_response(data, user: User) -> tuple[list[Bib], dict]:
                 "title": bib["briefInfo"]["title"],
                 "authors": "; ".join(bib["briefInfo"]["authors"]),
                 "format": bib["briefInfo"]["format"],
-                "checkedoutDate": checked_outs[k]["checkedoutDate"],
-                "metadataId": checked_outs[k]["metadataId"],
+                "checkedout_date": checked_outs[k]["checkedoutDate"],
+                "metadata_id": checked_outs[k]["metadataId"],
                 "id": checked_outs[k]["id"],
                 "person": user["name"],
             }

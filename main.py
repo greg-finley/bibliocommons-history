@@ -1,7 +1,7 @@
 import json
 import os
 import requests
-from flask import Response
+from flask import Response  # type: ignore
 from typing import NamedTuple, TypedDict
 
 
@@ -17,7 +17,7 @@ class User(TypedDict):
     account_id: str
 
 
-def main(request):
+def main(request) -> Response:
     credentials: list[User] = json.loads(os.environ["LIBRARY_CREDENTIALS"])
     processed_data = []
     for user in credentials:

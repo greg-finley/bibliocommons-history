@@ -11,6 +11,8 @@ python = "^3.9"
 python-dotenv = "^0.21.0"
 requests = "^2.31.0"
 
+[tool.poetry.group.dev.dependencies]
+types-requests = "^2.31.0.20240125"
 
 [build-system]
 requires = ["poetry-core"]

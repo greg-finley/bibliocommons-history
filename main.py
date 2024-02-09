@@ -2,15 +2,22 @@ from dotenv import load_dotenv
 import os
 import requests
 import csv
+from typing import NamedTuple
 
 load_dotenv()
 
 
+class Login(NamedTuple):
+    access_token: str
+    session_id: str
+
+
 def main():
+    login_details = login()
     i = 1
     all_processed_data = []
     while True:
-        data = get_data(i)
+        data = get_data(i, login_details)
         processed_data, pagination = handle_response(data)
         all_processed_data.extend(processed_data)
         print(pagination)
@@ -70,14 +77,48 @@ def write_to_csv(processed_data):
             writer.writerow(row)
 
 
-def get_data(page):
-    url = f"https://gateway.bibliocommons.com/v2/libraries/ssfpl/borrowinghistory?accountId={os.environ['ACCOUNT_ID']}&page={page}&locale=en-US"  # noqa
+def get_data(page: int, login: Login) -> dict:
     headers = {
-        "X-Access-Token": os.environ["X_ACCESS_TOKEN"],
-        "X-Session-Id": os.environ["X_SESSION_ID"],
+        "X-Access-Token": login.access_token,
+        "X-Session-Id": login.session_id,
     }
-    response = requests.get(url, headers=headers)
+
+    params = {
+        "accountId": os.environ["ACCOUNT_ID"],
+        "page": str(page),
+        "locale": "en-US",
+    }
+
+    response = requests.get(
+        "https://gateway.bibliocommons.com/v2/libraries/ssfpl/borrowinghistory",  # noqa E501
+        params=params,
+        headers=headers,
+    )
     return response.json()
+
+
+def login() -> Login:
+    s = requests.Session()
+    login_url = "https://ssfpl.bibliocommons.com/user/login"
+    payload = {
+        "utf8": "✓",
+        "name": os.environ["USER_ID"],
+        "user_pin": os.environ["USER_PIN"],
+    }
+
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+
+    response = s.post(login_url, data=payload, headers=headers)
+
+    if response.ok:
+        return Login(
+            access_token=s.cookies.get("bc_access_token"),
+            session_id=s.cookies.get("session_id"),
+        )
+    else:
+        raise Exception("Login failed")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,93 @@
+import datetime
+from typing import Literal, TypedDict
+
+import requests
+
+from fivetran import Bib
+from utils import chunkList
+
+
+class LibbyUser(TypedDict):
+    name: str
+    card_id: str
+    token: str
+    type: Literal["Libby"]
+
+
+class LibbyProcessor:
+    def __init__(self, user: LibbyUser):
+        self.user = user
+        self.page = 1
+        self.has_more = True
+        self.acts: list[dict] = []
+        self.bibs: list[Bib] = []
+
+    def process_user(self) -> list[Bib]:
+        while self.has_more:
+            self.get_acts()
+
+        chunked_acts = list(chunkList(self.acts, 50))
+        for chunk in chunked_acts:
+            self.process_act_chunk(chunk)
+
+        return self.bibs
+
+    def get_acts(self) -> None:
+        response = requests.get(
+            f'https://sentry-read.svc.overdrive.com/chip/migrating/{self.user["card_id"]}/history?page={self.page}',
+            headers={
+                "Authorization": f"Bearer {self.user['token']}",
+                "Accept": "application/json",
+            },
+        )
+        if not response.ok:
+            raise Exception("Libby API acts request failed")
+        data = response.json()
+        print(
+            "page: ",
+            data["page"],
+            "pages: ",
+            data["pages"],
+            "total: ",
+            data["total"],
+        )
+        self.acts.extend(data["acts"])
+        if data["pages"] == self.page:
+            self.has_more = False
+        self.page += 1
+
+    def process_act_chunk(self, chunk: list[dict]) -> None:
+        # curl 'https://thunder.api.overdrive.com/v2/media/bulk?titleIds=3940089,9598953,6133422,301511,1272309,4729922,9476284,1154606&x-client-id=dewey'
+        response = requests.get(
+            f"https://thunder.api.overdrive.com/v2/media/bulk?titleIds={','.join([str(i['titleId']) for i in chunk])}&x-client-id=dewey",
+        )
+        if not response.ok:
+            raise Exception("Libby API bulk request failed")
+        for i in response.json():
+            checkedout_date = None
+            for act in chunk:
+                if act["titleId"] == i["id"]:
+                    # i.e. 1685200993000
+                    checkedout_date = act["createTime"]
+                    break
+            if not checkedout_date:
+                raise Exception("Libby API cannot find act for title")
+            self.bibs.append(
+                Bib(
+                    title=i["title"],
+                    authors=(
+                        i["creators"][0]["name"]
+                        if i["creators"] and len(i["creators"])
+                        else ""
+                    ),
+                    format=i["type"]["id"],
+                    checkedout_date=datetime.datetime.fromtimestamp(
+                        checkedout_date / 1000
+                    )
+                    .date()
+                    .isoformat(),
+                    metadata_id=i["id"],
+                    id=i["id"] + "_" + str(checkedout_date),
+                    person=self.user["name"],
+                )
+            )

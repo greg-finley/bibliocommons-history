@@ -24,15 +24,15 @@ class LibbyProcessor:
 
     def process_user(self) -> list[Bib]:
         while self.has_more:
-            self.get_acts()
+            self._get_acts()
 
         chunked_acts = list(chunkList(self.acts, 50))
         for chunk in chunked_acts:
-            self.process_act_chunk(chunk)
+            self._process_act_chunk(chunk)
 
         return self.bibs
 
-    def get_acts(self) -> None:
+    def _get_acts(self) -> None:
         response = requests.get(
             f'https://sentry-read.svc.overdrive.com/chip/migrating/{self.user["card_id"]}/history?page={self.page}',
             headers={
@@ -56,7 +56,7 @@ class LibbyProcessor:
             self.has_more = False
         self.page += 1
 
-    def process_act_chunk(self, chunk: list[dict]) -> None:
+    def _process_act_chunk(self, chunk: list[dict]) -> None:
         # curl 'https://thunder.api.overdrive.com/v2/media/bulk?titleIds=3940089,9598953,6133422,301511,1272309,4729922,9476284,1154606&x-client-id=dewey'
         response = requests.get(
             f"https://thunder.api.overdrive.com/v2/media/bulk?titleIds={','.join([str(i['titleId']) for i in chunk])}&x-client-id=dewey",

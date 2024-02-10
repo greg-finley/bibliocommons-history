@@ -20,14 +20,14 @@ class BiblioCommonsUser(TypedDict):
 class BiblioCommonsProcessor:
     def __init__(self, user: BiblioCommonsUser):
         self.user = user
-        self.login_details = self.login()
+        self.login_details = self._login()
         self.page = 1
         self.bibs: list[Bib] = []
 
     def process_user(self) -> list[Bib]:
         while True:
-            data = self.get_data()
-            processed_data, pagination = self.handle_response(data)
+            data = self._get_data()
+            processed_data, pagination = self._handle_response(data)
             self.bibs.extend(processed_data)
             print(pagination)
             if pagination["page"] == pagination["pages"]:
@@ -36,7 +36,7 @@ class BiblioCommonsProcessor:
 
         return self.bibs
 
-    def handle_response(self, data) -> tuple[list[Bib], dict]:
+    def _handle_response(self, data) -> tuple[list[Bib], dict]:
         entities = data["entities"]
         bibs = entities["bibs"]
         borrowing_history = entities["borrowingHistory"]
@@ -66,7 +66,7 @@ class BiblioCommonsProcessor:
 
         return processed_data, pagination
 
-    def get_data(self) -> dict:
+    def _get_data(self) -> dict:
         headers = {
             "X-Access-Token": self.login_details.access_token,
             "X-Session-Id": self.login_details.session_id,
@@ -87,7 +87,7 @@ class BiblioCommonsProcessor:
             raise Exception("BiblioCommons API request failed")
         return response.json()
 
-    def login(self) -> Login:
+    def _login(self) -> Login:
         s = requests.Session()
         login_url = "https://ssfpl.bibliocommons.com/user/login"
         payload = {

@@ -16,8 +16,13 @@ This function automatically syncs my library borrowing history from Bibliocommon
 
 ## Libby
 
-1. Follow these instructions to export your history as a JSON: https://help.libbyapp.com/en-us/6207.htm
-2. You can keep accessing the export link later by the same user_id, but for now you need to manually redo the export to get the data to update
+1. You can get a bearer token from API calls that the Libby website is doing, or use the [odmpy](https://github.com/ping/odmpy?tab=readme-ov-file#usage) library:
+
+```shell
+ odmpy libby --settings .
+ cat libby.json
+ # (take the identity value from the json)
+```
 
 ## Google Cloud Function
 

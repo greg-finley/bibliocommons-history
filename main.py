@@ -3,7 +3,9 @@ import os
 import requests
 import datetime
 from flask import Response  # type: ignore
-from typing import Literal, NamedTuple, TypedDict
+from typing import Generator, Literal, NamedTuple, TypeVar, TypedDict, List
+
+T = TypeVar("T")
 
 
 class Login(NamedTuple):
@@ -13,7 +15,8 @@ class Login(NamedTuple):
 
 class LibbyUser(TypedDict):
     name: str
-    user_id: str
+    card_id: str
+    token: str
     type: Literal["Libby"]
 
 
@@ -69,26 +72,72 @@ def process_bibliocommons_user(user: BiblioCommonsUser) -> list[Bib]:
 
 
 def process_libby_user(user: LibbyUser) -> list[Bib]:
-    response = requests.get(
-        f"https://share.libbyapp.com/data/{user['user_id']}/libbytimeline-all-loans.json"
-    )
-    if not response.ok:
-        raise Exception("Libby API request failed")
-    return [
-        Bib(
-            title=i["title"]["text"],
-            authors=i["author"],
-            format=i["cover"]["format"],
-            # like 1707508484000 but needs to be like "2024-02-04"
-            checkedout_date=datetime.datetime.fromtimestamp(i["timestamp"] / 1000)
-            .date()
-            .isoformat(),
-            metadata_id=i["title"]["titleId"],
-            id=i["title"]["titleId"] + "_" + str(i["timestamp"]),
-            person=user["name"],
+    page = 1
+    has_more = True
+    acts = []
+    bibs: list[Bib] = []
+    while has_more:
+        response = requests.get(
+            f'https://sentry-read.svc.overdrive.com/chip/migrating/{user["card_id"]}/history?page={page}',
+            headers={
+                "Authorization": f"Bearer {user['token']}",
+                "Accept": "application/json",
+            },
         )
-        for i in response.json()["timeline"]
-    ]
+        if not response.ok:
+            raise Exception("Libby API acts request failed")
+        data = response.json()
+        print(
+            "page: ", data["page"], "pages: ", data["pages"], "total: ", data["total"]
+        )
+        acts.extend(data["acts"])
+        if data["pages"] == page:
+            has_more = False
+        page += 1
+
+    chunked_acts = list(chunks(acts, 50))
+    for chunk in chunked_acts:
+        # curl 'https://thunder.api.overdrive.com/v2/media/bulk?titleIds=3940089,9598953,6133422,301511,1272309,4729922,9476284,1154606&x-client-id=dewey'
+        response = requests.get(
+            f"https://thunder.api.overdrive.com/v2/media/bulk?titleIds={','.join([str(i['titleId']) for i in chunk])}&x-client-id=dewey",
+        )
+        if not response.ok:
+            raise Exception("Libby API bulk request failed")
+        for i in response.json():
+            checkedout_date = None
+            for act in chunk:
+                if act["titleId"] == i["id"]:
+                    # i.e. 1685200993000
+                    checkedout_date = act["createTime"]
+                    break
+            if not checkedout_date:
+                raise Exception("Libby API cannot find act for title")
+            bibs.append(
+                Bib(
+                    title=i["title"],
+                    authors=(
+                        i["creators"][0]["name"]
+                        if i["creators"] and len(i["creators"])
+                        else ""
+                    ),
+                    format=i["type"]["id"],
+                    checkedout_date=datetime.datetime.fromtimestamp(
+                        checkedout_date / 1000
+                    )
+                    .date()
+                    .isoformat(),
+                    metadata_id=i["id"],
+                    id=i["id"] + "_" + str(checkedout_date),
+                    person=user["name"],
+                )
+            )
+
+    return bibs
+
+
+def chunks(lst: List[T], n: int) -> Generator[List[T], None, None]:
+    for i in range(0, len(lst), n):
+        yield lst[i : i + n]
 
 
 def handle_response(data, user: BiblioCommonsUser) -> tuple[list[Bib], dict]:

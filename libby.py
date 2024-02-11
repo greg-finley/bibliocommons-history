@@ -21,8 +21,10 @@ class LibbyProcessor:
         self.has_more = True
         self.acts: list[dict] = []
         self.bibs: list[Bib] = []
+        self.count = 0
+        print(f"Processing {self.user['name']} {self.user['type']} ...")
 
-    def process_user(self) -> list[Bib]:
+    def process_user(self) -> tuple[list[Bib], int]:
         while self.has_more:
             self._get_acts()
 
@@ -30,7 +32,7 @@ class LibbyProcessor:
         for chunk in chunked_acts:
             self._process_act_chunk(chunk)
 
-        return self.bibs
+        return self.bibs, self.count
 
     def _get_acts(self) -> None:
         response = requests.get(
@@ -54,6 +56,7 @@ class LibbyProcessor:
         self.acts.extend(data["acts"])
         if data["pages"] == self.page:
             self.has_more = False
+            self.count = data["total"]
         self.page += 1
 
     def _process_act_chunk(self, chunk: list[dict]) -> None:

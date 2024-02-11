@@ -1,4 +1,3 @@
-import datetime
 from typing import TypedDict
 
 
@@ -12,12 +11,13 @@ class Bib(TypedDict):
     person: str
 
 
-def to_fivetran_response(bibs: list[Bib]) -> dict:
+State = dict[str, dict[str, int]]
+
+
+def to_fivetran_response(bibs: list[Bib], state: State) -> dict:
     # https://fivetran.com/docs/functions/google-cloud-functions#responseformat
     return {
-        "state": {
-            "borrowing": datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        },
+        "state": state,
         "insert": {
             "borrowing": bibs,
         },

@@ -26,7 +26,7 @@ jobs:
           name: "projects/greg-finley/locations/us-central1/functions/library-history"
           runtime: "python312"
           entry_point: "main"
-          secret_environment_variables: "LIBRARY_CREDENTIALS=projects/greg-finley/secrets/LIBRARY_CREDENTIALS/versions/latest"
+          secret_environment_variables: "MYSQL_CONFIG=projects/greg-finley/secrets/MYSQL_CONFIG/versions/latest,LIBRARY_CREDENTIALS=projects/greg-finley/secrets/LIBRARY_CREDENTIALS/versions/latest"
           memory_mb: 128
           timeout: 300
           min_instances: 0

@@ -2,6 +2,7 @@ from typing import Literal, NamedTuple, TypedDict
 
 import requests
 from fivetran import Bib
+from mysql import LatestCount
 
 
 class Login(NamedTuple):
@@ -18,23 +19,39 @@ class BiblioCommonsUser(TypedDict):
 
 
 class BiblioCommonsProcessor:
-    def __init__(self, user: BiblioCommonsUser):
+    def __init__(self, user: BiblioCommonsUser, latest_counts: list[LatestCount]):
         self.user = user
         self.login_details = self.login()
         self.page = 1
         self.bibs: list[Bib] = []
+        self.new_count = 0
+        self.first_acts = True
+        self.latest_count: LatestCount | None = None
+        for lc in latest_counts:
+            if lc.person == user["name"] and lc.type == "Libby":
+                self.latest_count = lc
+                break
+        print(f"Processing {user['name']} {user['type']}")
 
-    def process_user(self) -> list[Bib]:
+    def process_user(self) -> tuple[list[Bib], int]:
         while True:
             data = self.get_data()
             processed_data, pagination = self.handle_response(data)
-            self.bibs.extend(processed_data)
             print(pagination)
+            if (
+                self.first_acts
+                and self.latest_count
+                and pagination["count"] == self.latest_count.item_count
+            ):
+                print("No new items")
+                break
+            self.bibs.extend(processed_data)
             if pagination["page"] == pagination["pages"]:
                 break
             self.page += 1
+            self.first_acts = False
 
-        return self.bibs
+        return self.bibs, self.new_count
 
     def handle_response(self, data) -> tuple[list[Bib], dict]:
         entities = data["entities"]

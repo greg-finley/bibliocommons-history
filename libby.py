@@ -4,6 +4,7 @@ from typing import Literal, TypedDict
 import requests
 
 from fivetran import Bib
+from mysql import LatestCount
 from utils import chunkList
 
 
@@ -15,14 +16,22 @@ class LibbyUser(TypedDict):
 
 
 class LibbyProcessor:
-    def __init__(self, user: LibbyUser):
+    def __init__(self, user: LibbyUser, latest_counts: list[LatestCount]):
         self.user = user
         self.page = 1
         self.has_more = True
         self.acts: list[dict] = []
         self.bibs: list[Bib] = []
+        self.first_acts = True
+        self.new_count = 0
+        self.latest_count: LatestCount | None = None
+        for lc in latest_counts:
+            if lc.person == user["name"] and lc.type == "Libby":
+                self.latest_count = lc
+                break
+        print(f"Processing {user['name']} {user['type']}")
 
-    def process_user(self) -> list[Bib]:
+    def process_user(self) -> tuple[list[Bib], int]:
         while self.has_more:
             self.get_acts()
 
@@ -30,7 +39,7 @@ class LibbyProcessor:
         for chunk in chunked_acts:
             self.process_act_chunk(chunk)
 
-        return self.bibs
+        return self.bibs, self.new_count
 
     def get_acts(self) -> None:
         response = requests.get(
@@ -51,10 +60,20 @@ class LibbyProcessor:
             "total: ",
             data["total"],
         )
+        if (
+            self.first_acts
+            and self.latest_count
+            and self.latest_count.item_count >= data["total"]
+        ):
+            print("No new items")
+            self.has_more = False
+            return
         self.acts.extend(data["acts"])
         if data["pages"] == self.page:
             self.has_more = False
         self.page += 1
+        self.first_acts = False
+        self.new_count = data["total"]
 
     def process_act_chunk(self, chunk: list[dict]) -> None:
         # curl 'https://thunder.api.overdrive.com/v2/media/bulk?titleIds=3940089,9598953,6133422,301511,1272309,4729922,9476284,1154606&x-client-id=dewey'

@@ -15,13 +15,14 @@ class LibbyUser(TypedDict):
 
 
 class LibbyProcessor:
-    def __init__(self, user: LibbyUser):
+    def __init__(self, user: LibbyUser, old_count: int):
         self.user = user
         self.page = 1
         self.has_more = True
         self.acts: list[dict] = []
         self.bibs: list[Bib] = []
         self.count = 0
+        self.old_count = old_count
         print(f"Processing {self.user['name']} {self.user['type']} ...")
 
     def process_user(self) -> tuple[list[Bib], int]:
@@ -53,10 +54,14 @@ class LibbyProcessor:
             "total: ",
             data["total"],
         )
+        self.count = data["total"]
+        if self.old_count == data["total"]:
+            self.has_more = False
+            print("No new data")
+            return
         self.acts.extend(data["acts"])
         if data["pages"] == self.page:
             self.has_more = False
-            self.count = data["total"]
         self.page += 1
 
     def _process_act_chunk(self, chunk: list[dict]) -> None:

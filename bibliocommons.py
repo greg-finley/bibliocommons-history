@@ -18,22 +18,26 @@ class BiblioCommonsUser(TypedDict):
 
 
 class BiblioCommonsProcessor:
-    def __init__(self, user: BiblioCommonsUser):
+    def __init__(self, user: BiblioCommonsUser, old_count: int):
         self.user = user
         self.login_details = self._login()
         self.page = 1
         self.bibs: list[Bib] = []
         self.count = 0
+        self.old_count = old_count
         print(f"Processing {self.user['name']} {self.user['type']} ...")
 
     def process_user(self) -> tuple[list[Bib], int]:
         while True:
             data = self._get_data()
             processed_data, pagination = self._handle_response(data)
+            self.count = pagination["count"]
+            if pagination["count"] == self.old_count:
+                print("No new data")
+                break
             self.bibs.extend(processed_data)
             print(pagination)
             if pagination["page"] == pagination["pages"]:
-                self.count = pagination["count"]
                 break
             self.page += 1
 

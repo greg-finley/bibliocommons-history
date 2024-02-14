@@ -44,6 +44,7 @@ class LibbyProcessor:
             },
         )
         if not response.ok:
+            print(response.text)
             raise Exception("Libby API acts request failed")
         data = response.json()
         print(
@@ -70,6 +71,7 @@ class LibbyProcessor:
             f"https://thunder.api.overdrive.com/v2/media/bulk?titleIds={','.join([str(i['titleId']) for i in chunk])}&x-client-id=dewey",
         )
         if not response.ok:
+            print(response.text)
             raise Exception("Libby API bulk request failed")
         for i in response.json():
             checkedout_date = None

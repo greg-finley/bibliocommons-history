@@ -91,6 +91,7 @@ class BiblioCommonsProcessor:
             headers=headers,
         )
         if not response.ok:
+            print(response.text)
             raise Exception("BiblioCommons API request failed")
         return response.json()
 
@@ -115,4 +116,5 @@ class BiblioCommonsProcessor:
                 session_id=s.cookies.get("session_id"),
             )
         else:
+            print(response.text)
             raise Exception("Bibliocommons login failed")

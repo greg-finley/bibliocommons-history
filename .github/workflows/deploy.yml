@@ -23,7 +23,7 @@ jobs:
       - id: "deploy"
         uses: "google-github-actions/deploy-cloud-functions@v1"
         with:
-          name: "projects/greg-finley/locations/us-central1/functions/library-history"
+          name: "projects/greg-finley/locations/us-east4/functions/library-history"
           runtime: "python312"
           entry_point: "main"
           secret_environment_variables: "LIBRARY_CREDENTIALS=projects/greg-finley/secrets/LIBRARY_CREDENTIALS/versions/latest"

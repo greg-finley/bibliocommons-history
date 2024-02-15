@@ -32,11 +32,11 @@ class BiblioCommonsProcessor:
             data = self._get_data()
             processed_data, pagination = self._handle_response(data)
             self.count = pagination["count"]
+            print(pagination)
             if pagination["count"] == self.old_count:
                 print("No new data")
                 break
             self.bibs.extend(processed_data)
-            print(pagination)
             if pagination["page"] == pagination["pages"]:
                 break
             self.page += 1

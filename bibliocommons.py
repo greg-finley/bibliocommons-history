@@ -83,6 +83,7 @@ class BiblioCommonsProcessor:
             "accountId": self.user["account_id"],
             "page": str(self.page),
             "locale": "en-US",
+            "size": "200",
         }
 
         http_client = HttpClient()

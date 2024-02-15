@@ -1,9 +1,8 @@
 import datetime
 from typing import Literal, TypedDict
 
-import requests
-
 from fivetran import Bib
+from http_client import HttpClient
 from utils import chunkList
 
 
@@ -36,7 +35,8 @@ class LibbyProcessor:
         return self.bibs, self.count
 
     def _get_acts(self) -> None:
-        response = requests.get(
+        http_client = HttpClient()
+        response = http_client.get(
             f'https://sentry-read.svc.overdrive.com/chip/migrating/{self.user["card_id"]}/history?page={self.page}',
             headers={
                 "Authorization": f"Bearer {self.user['token']}",
@@ -67,7 +67,8 @@ class LibbyProcessor:
 
     def _process_act_chunk(self, chunk: list[dict]) -> None:
         # curl 'https://thunder.api.overdrive.com/v2/media/bulk?titleIds=3940089,9598953,6133422,301511,1272309,4729922,9476284,1154606&x-client-id=dewey'
-        response = requests.get(
+        http_client = HttpClient()
+        response = http_client.get(
             f"https://thunder.api.overdrive.com/v2/media/bulk?titleIds={','.join([str(i['titleId']) for i in chunk])}&x-client-id=dewey",
         )
         if not response.ok:

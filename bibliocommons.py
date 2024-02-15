@@ -1,7 +1,7 @@
 from typing import Literal, NamedTuple, TypedDict
 
-import requests
 from fivetran import Bib
+from http_client import HttpClient
 
 
 class Login(NamedTuple):
@@ -85,7 +85,8 @@ class BiblioCommonsProcessor:
             "locale": "en-US",
         }
 
-        response = requests.get(
+        http_client = HttpClient()
+        response = http_client.get(
             "https://gateway.bibliocommons.com/v2/libraries/ssfpl/borrowinghistory",  # noqa E501
             params=params,
             headers=headers,
@@ -96,7 +97,6 @@ class BiblioCommonsProcessor:
         return response.json()
 
     def _login(self) -> Login:
-        s = requests.Session()
         login_url = "https://ssfpl.bibliocommons.com/user/login"
         payload = {
             "utf8": "✓",
@@ -108,12 +108,13 @@ class BiblioCommonsProcessor:
             "Content-Type": "application/x-www-form-urlencoded",
         }
 
-        response = s.post(login_url, data=payload, headers=headers)
+        http_client = HttpClient()
+        response = http_client.post(login_url, data=payload, headers=headers)
 
         if response.ok:
             return Login(
-                access_token=s.cookies.get("bc_access_token"),
-                session_id=s.cookies.get("session_id"),
+                access_token=http_client.s.cookies.get("bc_access_token"),
+                session_id=http_client.s.cookies.get("session_id"),
             )
         else:
             print(response.text)

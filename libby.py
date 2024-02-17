@@ -67,8 +67,10 @@ class LibbyProcessor:
         self.acts.extend(data["acts"])
         if data["pages"] == self.page:
             print("Reached last page")
+
             self.has_more = False
-        else:
+        # Make sure we aren't doing a historical resync, then do a date guard
+        elif self.old_count:
             last_act = data["acts"][-1]
             last_act_create_time = last_act["createTime"]
             if last_act_create_time < ONE_YEAR_AGO:

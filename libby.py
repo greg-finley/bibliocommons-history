@@ -5,6 +5,10 @@ from fivetran import Bib
 from http_client import HttpClient
 from utils import chunkList
 
+ONE_YEAR_AGO = (
+    datetime.datetime.now() - datetime.timedelta(days=365)
+).timestamp() * 1000
+
 
 class LibbyUser(TypedDict):
     name: str
@@ -62,7 +66,14 @@ class LibbyProcessor:
             return
         self.acts.extend(data["acts"])
         if data["pages"] == self.page:
+            print("Reached last page")
             self.has_more = False
+        else:
+            last_act = data["acts"][-1]
+            last_act_create_time = last_act["createTime"]
+            if last_act_create_time < ONE_YEAR_AGO:
+                print("Reached old acts, stopping")
+                self.has_more = False
         self.page += 1
 
     def _process_act_chunk(self, chunk: list[dict]) -> None:

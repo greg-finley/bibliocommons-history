@@ -2,6 +2,7 @@ from typing import Literal, NamedTuple, TypedDict
 
 from fivetran import Bib
 from http_client import HttpClient
+from datetime import datetime, timedelta
 
 
 class Login(NamedTuple):
@@ -15,6 +16,9 @@ class BiblioCommonsUser(TypedDict):
     user_pin: str
     account_id: str
     type: Literal["BiblioCommons"]
+
+
+ONE_YEAR_AGO = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
 
 
 class BiblioCommonsProcessor:
@@ -38,6 +42,10 @@ class BiblioCommonsProcessor:
                 break
             self.bibs.extend(processed_data)
             if pagination["page"] == pagination["pages"]:
+                break
+            # Check self.old_count in case we are doing a historical resync
+            if self.old_count and self._is_last_bib_old(processed_data):
+                print("Reached old bibs, stopping")
                 break
             self.page += 1
 
@@ -95,6 +103,13 @@ class BiblioCommonsProcessor:
             print(response.text)
             raise Exception("BiblioCommons API request failed")
         return response.json()
+
+    def _is_last_bib_old(self, processed_data: list[Bib]) -> bool:
+        """If last bib is from over a year ago, stop processing"""
+        if processed_data:
+            last_bib = processed_data[-1]
+            return last_bib["checkedout_date"] < ONE_YEAR_AGO
+        return False
 
     def _login(self) -> Login:
         login_url = "https://ssfpl.bibliocommons.com/user/login"

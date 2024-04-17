@@ -22,10 +22,11 @@ def main(request) -> Response:
     state: State = {"Libby": {}, "BiblioCommons": {}}
     for user in credentials:
         if user["type"] == "Libby":
-            old_count = old_state.get("Libby", {}).get(user["name"], 0)
-            data, count = LibbyProcessor(user, old_count).process_user()
-            processed_data.extend(data)
-            state["Libby"][user["name"]] = count
+            pass
+            # old_count = old_state.get("Libby", {}).get(user["name"], 0)
+            # data, count = LibbyProcessor(user, old_count).process_user()
+            # processed_data.extend(data)
+            # state["Libby"][user["name"]] = count
         elif user["type"] == "BiblioCommons":
             old_count = old_state.get("BiblioCommons", {}).get(user["name"], 0)
             data, count = BiblioCommonsProcessor(user, old_count).process_user()
